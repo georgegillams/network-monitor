@@ -1,0 +1,24 @@
+{
+  "name": "network-monitor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "babel-node index.js",
+    "test": "echo \"No tests yet\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/georgegillams/network-monitor.git"
+  },
+  "author": "@georgegillams",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/georgegillams/network-monitor/issues"
+  },
+  "homepage": "https://github.com/georgegillams/network-monitor#readme",
+  "devDependencies": {
+    "@babel/core": "^7.20.7",
+    "@babel/node": "^7.20.7"
+  }
+}
