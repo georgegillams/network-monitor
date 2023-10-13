@@ -3,10 +3,10 @@ const fs = require("fs");
 const http = require("http");
 
 const LOG_FILE = "../network_monitor_log.txt";
-const SECONDS_60 = 60 * 1000;
-const TIME_BETWEEN_CHECKS = SECONDS_60;
-const HOURS_1 = 60 * 60 * 1000;
-const TIME_BETWEEN_SPEED_TESTS = HOURS_1;
+const MINUTES_5 = 5 * 60 * 1000;
+const TIME_BETWEEN_CHECKS = MINUTES_5;
+const HOURS_5 = 5 * 60 * 60 * 1000;
+const TIME_BETWEEN_SPEED_TESTS = HOURS_5;
 
 let lastStatus = null;
 
