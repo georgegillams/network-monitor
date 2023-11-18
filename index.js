@@ -1,14 +1,24 @@
 const { execSync } = require("child_process");
 const fs = require("fs");
 const http = require("http");
+const { simpleFetch, getTimestampString } = require("./utils");
 
-const LOG_FILE = "../network_monitor_log.txt";
 const MINUTES_2 = 2 * 60 * 1000;
 const TIME_BETWEEN_CHECKS = MINUTES_2;
 const HOURS_4 = 4 * 60 * 60 * 1000;
 const TIME_BETWEEN_SPEED_TESTS = HOURS_4;
 
-let lastStatus = null;
+const LOG_FILE = "../network_monitor_log.txt";
+
+const HUB_IP_ADDRESS = "192.168.1.254";
+const HUB_SETTINGS_URL = `http://${HUB_IP_ADDRESS}`;
+
+const LTE_STATUS_UNKNOWN = "Unknown";
+const LTE_STATUS_PREFIX = `<span id="lte_status">`;
+const LTE_STATUS_SUFFIX = "</span>";
+
+let lastNetworkStatus = null;
+let lastLteStatus = null;
 
 const waitFor = async (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,14 +35,19 @@ const requestListener = async (req, res) => {
   }
 };
 
-const logNetworkStatus = (status) => {
-  if (lastStatus !== status) {
-    lastStatus = status;
+const logLteStatus = (status) => {
+  if (lastLteStatus !== status) {
+    lastLteStatus = status;
 
-    fs.appendFileSync(
-      LOG_FILE,
-      `${new Date().toISOString()} NETWORK ${status}\n`
-    );
+    fs.appendFileSync(LOG_FILE, `${getTimestampString} LTE ${status}\n`);
+  }
+};
+
+const logNetworkStatus = (status) => {
+  if (lastNetworkStatus !== status) {
+    lastNetworkStatus = status;
+
+    fs.appendFileSync(LOG_FILE, `${getTimestampString()} NETWORK ${status}\n`);
   }
 };
 
@@ -53,18 +68,32 @@ const checkNetwork = async () => {
   }
 };
 
+const checkLTEStatus = async () => {
+  try {
+    const hubSettingsHtml = await simpleFetch(HUB_SETTINGS_URL);
+    if (hubSettingsHtml.includes(LTE_STATUS_PREFIX)) {
+      const lteStatus = hubSettingsHtml
+        .split(LTE_STATUS_PREFIX)[1]
+        .split(LTE_STATUS_SUFFIX)[0];
+      logLteStatus(lteStatus);
+    } else {
+      logLteStatus(LTE_STATUS_UNKNOWN);
+    }
+  } catch (error) {}
+};
+
 const runSpeedTest = () => {
   try {
     const speedTestResults = execSync("speedtest-cli --simple").toString();
     const resultsString = speedTestResults.split("\n").join(" ");
     fs.appendFileSync(
       `${LOG_FILE}`,
-      `${new Date().toISOString()} ${resultsString}\n`
+      `${getTimestampString()} ${resultsString}\n`
     );
   } catch (error) {
     fs.appendFileSync(
       `${LOG_FILE}`,
-      `${new Date().toISOString()} Speed test failed\n`
+      `${getTimestampString()} Speed test failed\n`
     );
   }
 };
@@ -75,6 +104,7 @@ setInterval(() => {
 
 setInterval(() => {
   checkNetwork();
+  checkLTEStatus();
 }, TIME_BETWEEN_CHECKS);
 
 const server = http.createServer();
@@ -82,4 +112,4 @@ server.on("request", requestListener);
 
 server.listen(process.env.PORT || 8080);
 
-fs.appendFileSync(LOG_FILE, `${new Date().toISOString()} SERVER RUNNING\n`);
+fs.appendFileSync(LOG_FILE, `${getTimestampString()} SERVER RUNNING\n`);
