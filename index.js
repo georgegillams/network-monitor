@@ -39,7 +39,7 @@ const logLteStatus = (status) => {
   if (lastLteStatus !== status) {
     lastLteStatus = status;
 
-    fs.appendFileSync(LOG_FILE, `${getTimestampString} LTE ${status}\n`);
+    fs.appendFileSync(LOG_FILE, `${getTimestampString()} LTE ${status}\n`);
   }
 };
 
