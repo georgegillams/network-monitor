@@ -3,8 +3,8 @@ const fs = require("fs");
 const http = require("http");
 const { simpleFetch, getTimestampString } = require("./utils");
 
-const MINUTES_2 = 2 * 60 * 1000;
-const TIME_BETWEEN_CHECKS = MINUTES_2;
+const MINUTES_3 = 3 * 60 * 1000;
+const TIME_BETWEEN_CHECKS = MINUTES_3;
 const HOURS_4 = 4 * 60 * 60 * 1000;
 const TIME_BETWEEN_SPEED_TESTS = HOURS_4;
 
@@ -61,7 +61,7 @@ const logNetworkDown = () => {
 
 const checkNetwork = async () => {
   try {
-    execSync("ping -c 3 google.com");
+    execSync("ping -c 1 google.com");
     logNetworkUp();
   } catch (error) {
     logNetworkDown();
