@@ -85,7 +85,10 @@ const checkLTEStatus = async () => {
       logLteStatus(LTE_STATUS_UNKNOWN);
     }
   } catch (error) {
-    fs.appendFileSync(`${LOG_FILE}`, `${getTimestampString()} ${error}\n\n`);
+    fs.appendFileSync(
+      `${LOG_FILE}`,
+      `${getTimestampString()} Checking LTE status failed: ${error}\n\n`
+    );
   }
 };
 
