@@ -1,7 +1,7 @@
 const { execSync } = require("child_process");
 const fs = require("fs");
 const http = require("http");
-const { simpleFetch, getTimestampString } = require("./utils");
+const { simpleFetch, getTimestampString, getCliArg } = require("./utils");
 
 const MINUTES_3 = 3 * 60 * 1000;
 const TIME_BETWEEN_CHECKS = MINUTES_3;
@@ -19,6 +19,8 @@ const LTE_STATUS_SUFFIX = "</span>";
 
 let lastNetworkStatus = null;
 let lastLteStatus = null;
+
+const executablePathArg = getCliArg("executable-path");
 
 const waitFor = async (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,7 +72,10 @@ const checkNetwork = async () => {
 
 const checkLTEStatus = async () => {
   try {
-    const hubSettingsHtml = await simpleFetch(HUB_SETTINGS_URL);
+    const hubSettingsHtml = await simpleFetch(
+      HUB_SETTINGS_URL,
+      executablePathArg
+    );
     if (hubSettingsHtml.includes(LTE_STATUS_PREFIX)) {
       const lteStatus = hubSettingsHtml
         .split(LTE_STATUS_PREFIX)[1]
@@ -79,7 +84,9 @@ const checkLTEStatus = async () => {
     } else {
       logLteStatus(LTE_STATUS_UNKNOWN);
     }
-  } catch (error) {}
+  } catch (error) {
+    fs.appendFileSync(`${LOG_FILE}`, `${getTimestampString()} ${error}\n\n`);
+  }
 };
 
 const runSpeedTest = () => {
