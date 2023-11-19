@@ -12,3 +12,11 @@ A simple server application which can be run on a raspberry pi to monitor networ
 
 - Run yarn
 - Configure the Pi to run `yarn start` on boot using PM2, crontab, or similar.
+
+# Specify chromium executable path
+
+If you want to specify the chromium executable path, use the `--executable-path` argument. eg
+
+```bash
+yarn start --executable-path "/usr/bin/chromium-browser"
+```
