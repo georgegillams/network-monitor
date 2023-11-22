@@ -7,6 +7,7 @@ const MINUTES_3 = 3 * 60 * 1000;
 const TIME_BETWEEN_CHECKS = MINUTES_3;
 const HOURS_4 = 4 * 60 * 60 * 1000;
 const TIME_BETWEEN_SPEED_TESTS = HOURS_4;
+const TIME_BEFORE_UNCONDITIONAL_LOG = HOURS_4;
 
 const LOG_FILE = "../network_monitor_log.txt";
 
@@ -19,6 +20,8 @@ const LTE_STATUS_SUFFIX = "</span>";
 
 let lastNetworkStatus = null;
 let lastLteStatus = null;
+let lastNetworkStatusLogTimestamp = 0;
+let lastLteStatusLogTimestamp = 0;
 
 const executablePathArg = getCliArg("executable-path");
 
@@ -38,17 +41,25 @@ const requestListener = async (req, res) => {
 };
 
 const logLteStatus = (status) => {
-  if (lastLteStatus !== status) {
-    lastLteStatus = status;
+  const statusChanged = lastLteStatus !== status;
+  const logUnconditionally =
+    lastLteStatusLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
 
+  if (statusChanged || logUnconditionally) {
+    lastLteStatus = status;
+    lastLteStatusLogTimestamp = Date.now();
     fs.appendFileSync(LOG_FILE, `${getTimestampString()} LTE ${status}\n`);
   }
 };
 
 const logNetworkStatus = (status) => {
-  if (lastNetworkStatus !== status) {
-    lastNetworkStatus = status;
+  const statusChanged = lastNetworkStatus !== status;
+  const logUnconditionally =
+    lastNetworkStatusLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
 
+  if (statusChanged || logUnconditionally) {
+    lastNetworkStatus = status;
+    lastNetworkStatusLogTimestamp = Date.now();
     fs.appendFileSync(LOG_FILE, `${getTimestampString()} NETWORK ${status}\n`);
   }
 };

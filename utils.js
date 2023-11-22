@@ -1,12 +1,22 @@
 const puppeteer = require("puppeteer");
 
-const simpleFetch = async (url, executablePathArg = null) => {
-  try {
-    // Launch the browser and open a new blank page
-    const browser = await puppeteer.launch({
+let browser = null;
+
+const getBrowser = async (executablePathArg) => {
+  if (!browser) {
+    browser = await puppeteer.launch({
       headless: "new",
       ...(executablePathArg ? { executablePath: executablePathArg } : {}),
     });
+  }
+
+  return browser;
+};
+
+const simpleFetch = async (url, executablePathArg = null) => {
+  try {
+    // Launch the browser and open a new blank page
+    const browser = await getBrowser(executablePathArg);
     const page = await browser.newPage();
 
     // Navigate the page to a URL
@@ -22,7 +32,7 @@ const simpleFetch = async (url, executablePathArg = null) => {
     const pageContent = await page.content();
 
     // close browser
-    await browser.close();
+    await page.close();
 
     return pageContent;
   } catch (error) {
