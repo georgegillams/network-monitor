@@ -98,14 +98,16 @@ const checkLTEStatus = async () => {
   } catch (error) {
     fs.appendFileSync(
       `${LOG_FILE}`,
-      `${getTimestampString()} Checking LTE status failed: ${error}\n\n`
+      `${getTimestampString()} Checking LTE status failed\n`
     );
   }
 };
 
 const runSpeedTest = () => {
   try {
-    const speedTestResults = execSync("speedtest-cli --simple").toString();
+    const speedTestResults = execSync(
+      "speedtest-cli --secure --simple"
+    ).toString();
     const resultsString = speedTestResults.split("\n").join(" ");
     fs.appendFileSync(
       `${LOG_FILE}`,
