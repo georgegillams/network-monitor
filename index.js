@@ -146,10 +146,6 @@ const checkLTEStatus = async () => {
     }
   } catch (error) {
     fs.appendFileSync(
-      `${LOG_FILE}`,
-      `${getTimestampString()} Checking LTE status failed\n`
-    );
-    fs.appendFileSync(
       `${ERROR_FILE}`,
       `${getTimestampString()} Checking LTE status failed\n${error}\n\n`
     );
@@ -167,10 +163,6 @@ const runSpeedTest = () => {
       `${getTimestampString()} ${resultsString}\n`
     );
   } catch (error) {
-    fs.appendFileSync(
-      `${LOG_FILE}`,
-      `${getTimestampString()} Speed test failed\n`
-    );
     fs.appendFileSync(
       `${ERROR_FILE}`,
       `${getTimestampString()} Speed test failed\n${error}\n\n`

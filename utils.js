@@ -59,14 +59,35 @@ const logsToHtml = (logs) => {
     <style>
       body {
         font-family: monospace;
-        background: #1e1e1e;
-        color: white;
+        background: white;
+        color: #1e1e1e;
         line-height: 1.4;
+        font-size: 1.2rem;
+      }
+
+      a {
+        color: #9932cc
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1e1e1e;
+          color: white;
+        }
+  
+        a {
+          color: #da70d6
+        }
       }
     </style>
   </head>
   <body>
     <div>${logs.split("\n").join("<br/>")}</div>
+    <div>
+      <a href="/logs">Logs</a>
+      <br/>
+      <a href="/errors">Errors</a>
+    <br/>
     <script type="text/javascript">
       window.scrollTo(0, document.body.scrollHeight);
     </script>
