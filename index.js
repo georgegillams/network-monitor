@@ -3,10 +3,11 @@ const fs = require("fs");
 const http = require("http");
 const { simpleFetch, getTimestampString, getCliArg } = require("./utils");
 
-const MINUTES_3 = 3 * 60 * 1000;
-const TIME_BETWEEN_CHECKS = MINUTES_3;
+const MINUTES_1 = 1 * 60 * 1000;
+const HOURS_2 = 2 * 60 * 60 * 1000;
 const HOURS_4 = 4 * 60 * 60 * 1000;
-const TIME_BETWEEN_SPEED_TESTS = HOURS_4;
+const TIME_BETWEEN_CHECKS = MINUTES_1;
+const TIME_BETWEEN_SPEED_TESTS = HOURS_2;
 const TIME_BEFORE_UNCONDITIONAL_LOG = HOURS_4;
 
 const LOG_FILE = "../network_monitor_log.txt";
