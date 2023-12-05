@@ -1,7 +1,12 @@
 const { execSync } = require("child_process");
 const fs = require("fs");
 const http = require("http");
-const { simpleFetch, getTimestampString, getCliArg } = require("./utils");
+const {
+  simpleFetch,
+  getTimestampString,
+  getCliArg,
+  logsToHtml,
+} = require("./utils");
 
 const MINUTES_1 = 1 * 60 * 1000;
 const HOURS_2 = 2 * 60 * 60 * 1000;
@@ -38,14 +43,18 @@ const waitFor = async (ms) => {
 };
 
 const requestListener = async (req, res) => {
-  if (req.url === "/logs") {
+  if (req.url === "/logs-raw") {
     const logs = fs.readFileSync(LOG_FILE, { encoding: "utf-8" });
     res.writeHead(200);
     res.end(logs);
+  } else if (req.url === "/logs") {
+    const logs = fs.readFileSync(LOG_FILE, { encoding: "utf-8" });
+    res.writeHead(200);
+    res.end(logsToHtml(logs));
   } else if (req.url === "/errors") {
     const logs = fs.readFileSync(ERROR_FILE, { encoding: "utf-8" });
     res.writeHead(200);
-    res.end(logs);
+    res.end(logsToHtml(logs));
   } else {
     res.writeHead(404);
     res.end("Not found");
