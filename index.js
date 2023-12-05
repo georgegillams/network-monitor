@@ -11,6 +11,7 @@ const TIME_BETWEEN_SPEED_TESTS = HOURS_2;
 const TIME_BEFORE_UNCONDITIONAL_LOG = HOURS_4;
 
 const LOG_FILE = "../network_monitor_log.txt";
+const ERROR_FILE = "../network_monitor_error.txt";
 
 const HUB_IP_ADDRESS = "192.168.1.254";
 const HUB_SETTINGS_URL = `http://${HUB_IP_ADDRESS}`;
@@ -39,6 +40,10 @@ const waitFor = async (ms) => {
 const requestListener = async (req, res) => {
   if (req.url === "/logs") {
     const logs = fs.readFileSync(LOG_FILE, { encoding: "utf-8" });
+    res.writeHead(200);
+    res.end(logs);
+  } else if (req.url === "/errors") {
+    const logs = fs.readFileSync(ERROR_FILE, { encoding: "utf-8" });
     res.writeHead(200);
     res.end(logs);
   } else {
@@ -101,6 +106,10 @@ const checkNetwork = async () => {
     logNetworkUp();
   } catch (error) {
     logNetworkDown();
+    fs.appendFileSync(
+      `${ERROR_FILE}`,
+      `${getTimestampString()} Ping failed\n${error}\n\n`
+    );
   }
 };
 
@@ -131,6 +140,10 @@ const checkLTEStatus = async () => {
       `${LOG_FILE}`,
       `${getTimestampString()} Checking LTE status failed\n`
     );
+    fs.appendFileSync(
+      `${ERROR_FILE}`,
+      `${getTimestampString()} Checking LTE status failed\n${error}\n\n`
+    );
   }
 };
 
@@ -148,6 +161,10 @@ const runSpeedTest = () => {
     fs.appendFileSync(
       `${LOG_FILE}`,
       `${getTimestampString()} Speed test failed\n`
+    );
+    fs.appendFileSync(
+      `${ERROR_FILE}`,
+      `${getTimestampString()} Speed test failed\n${error}\n\n`
     );
   }
 };
