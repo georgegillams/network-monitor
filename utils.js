@@ -36,6 +36,7 @@ const simpleFetch = async (url, executablePathArg = null) => {
 
     return pageContent;
   } catch (error) {
+    await page?.close?.()
     console.error(`something went wrong fetching ${url}`, error);
     throw error;
   }
