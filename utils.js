@@ -1,8 +1,9 @@
 const puppeteer = require("puppeteer");
 
 let browser = null;
+let page = null;
 
-const getBrowser = async (executablePathArg) => {
+const createBrowser = async (executablePathArg) => {
   if (!browser) {
     browser = await puppeteer.launch({
       headless: "new",
@@ -16,8 +17,8 @@ const getBrowser = async (executablePathArg) => {
 const simpleFetch = async (url, executablePathArg = null) => {
   try {
     // Launch the browser and open a new blank page
-    const browser = await getBrowser(executablePathArg);
-    const page = await browser.newPage();
+    await createBrowser(executablePathArg);
+    page = await browser.newPage();
 
     // Navigate the page to a URL
     await page.goto(url);
