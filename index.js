@@ -109,16 +109,27 @@ const logNetworkDown = () => {
   logNetworkStatus("DOWN");
 };
 
-const checkNetwork = async () => {
+const isNetworkUp = () => {
   try {
     execSync("ping -c 1 google.com");
-    logNetworkUp();
+    return true;
   } catch (error) {
+    return false;
+  }
+};
+
+const checkNetwork = async (numberOfRetries = 0) => {
+  let networkUp = false;
+  for (let i = 0; i < 3; i += 1) {
+    if (isNetworkUp()) {
+      networkUp = true;
+      break;
+    }
+  }
+  if (networkUp) {
+    logNetworkUp();
+  } else {
     logNetworkDown();
-    fs.appendFileSync(
-      `${ERROR_FILE}`,
-      `${getTimestampString()} Ping failed\n${error}\n\n`
-    );
   }
 };
 
