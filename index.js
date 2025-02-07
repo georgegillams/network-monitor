@@ -20,14 +20,10 @@ const STATUS_STANDBY = 'Standby';
 const STATUS_UNKNOWN = 'Unknown';
 
 let lastNetworkStatus = null;
-let lastFttpBroadbandStatus = null;
-let lastFttcBroadbandStatus = null;
-let lastLteStatus = null;
+let lastConnectionStatus = null;
 let lastIpAddress = null;
 let lastNetworkStatusLogTimestamp = 0;
-let lastFttpBroadbandStatusLogTimestamp = 0;
-let lastFttcBroadbandStatusLogTimestamp = 0;
-let lastLteStatusLogTimestamp = 0;
+let lastConnectionStatusLogTimestamp = 0;
 let lastIpAddressLogTimestamp = 0;
 
 const requestListener = async (req, res) => {
@@ -85,27 +81,6 @@ const addIpAddress = (type, ipAddress) => {
   fs.writeFileSync(IP_ADDRESS_FILE, JSON.stringify(ipAddresses, null, 2));
 };
 
-const logFttpBroadbandStatus = status => {
-  const statusChanged = lastFttpBroadbandStatus !== status;
-  const logUnconditionally = lastFttpBroadbandStatusLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
-
-  if (statusChanged || logUnconditionally) {
-    lastFttpBroadbandStatus = status;
-    lastFttpBroadbandStatusLogTimestamp = Date.now();
-    fs.appendFileSync(LOG_FILE, `${getTimestampString()} FTTP Broadband ${status}\n`);
-  }
-};
-
-const logLteStatus = status => {
-  const statusChanged = lastLteStatus !== status;
-  const logUnconditionally = lastLteStatusLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
-
-  if (statusChanged || logUnconditionally) {
-    lastLteStatus = status;
-    lastLteStatusLogTimestamp = Date.now();
-    fs.appendFileSync(LOG_FILE, `${getTimestampString()} LTE ${status}\n`);
-  }
-};
 
 const logPublicIpAddress = ipAddress => {
   const ipChanged = lastIpAddress !== ipAddress;
@@ -118,14 +93,17 @@ const logPublicIpAddress = ipAddress => {
   }
 };
 
-const logFttcBroadbandStatus = status => {
-  const statusChanged = lastFttcBroadbandStatus !== status;
-  const logUnconditionally = lastFttcBroadbandStatusLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
+
+const logConnectionStatus = (fttpBroadbandStatus, fttcBroadbandStatus, lteStatus) => {
+  const newConnectionStatus = `${fttpBroadbandStatus} ${fttcBroadbandStatus} ${lteStatus}`;
+  const statusChanged = lastConnectionStatus !== newConnectionStatus;
+  const logUnconditionally = lastConnectionStatus < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
 
   if (statusChanged || logUnconditionally) {
-    lastFttcBroadbandStatus = status;
-    lastFttcBroadbandStatusLogTimestamp = Date.now();
-    fs.appendFileSync(LOG_FILE, `${getTimestampString()} FTTC Broadband ${status}\n`);
+    lastConnectionStatus = newConnectionStatus;
+    lastConnectionStatusLogTimestamp = Date.now();
+    const timeStamp = getTimestampString();
+    fs.appendFileSync(LOG_FILE, `${timeStamp} FTTP Broadband ${fttpBroadbandStatus}\n${timeStamp} FTTC Broadband ${fttcBroadbandStatus}\n${timeStamp} LTE ${lteStatus}\n`);
   }
 };
 
@@ -177,7 +155,7 @@ const checkConnectionStatus = async () => {
     if (!fs.existsSync(IP_ADDRESS_FILE)) {
       fs.writeFileSync(
         IP_ADDRESS_FILE,
-        JSON.stringify({ fttpBroadbandIpAddresses: [], fttcBroadbandIpAddresses: [], mobileIpAddresses: [] })
+        JSON.stringify({ fttpBroadbandIpAddresses: [], fttcBroadbandIpAddresses: [], mobileIpAddresses: [] }),
       );
     }
 
@@ -191,21 +169,13 @@ const checkConnectionStatus = async () => {
     const mobileConnected = mobileIpAddresses.some(address => publicIPAddress.includes(address));
     logPublicIpAddress(publicIPAddress);
     if (fttpBroadbandConnected) {
-      logFttpBroadbandStatus(STATUS_CONNECTED);
-      logFttcBroadbandStatus(STATUS_STANDBY);
-      logLteStatus(STATUS_STANDBY);
+      logConnectionStatus(STATUS_CONNECTED, STATUS_STANDBY, STATUS_STANDBY);
     } else if (fttcBroadbandConnected) {
-      logFttpBroadbandStatus(STATUS_DISCONNECTED);
-      logFttcBroadbandStatus(STATUS_CONNECTED);
-      logLteStatus(STATUS_STANDBY);
+      logConnectionStatus(STATUS_DISCONNECTED, STATUS_CONNECTED, STATUS_STANDBY);
     } else if (mobileConnected) {
-      logFttpBroadbandStatus(STATUS_DISCONNECTED);
-      logFttcBroadbandStatus(STATUS_DISCONNECTED);
-      logLteStatus(STATUS_CONNECTED);
+      logConnectionStatus(STATUS_DISCONNECTED, STATUS_DISCONNECTED, STATUS_CONNECTED);
     } else {
-      logFttpBroadbandStatus(STATUS_UNKNOWN);
-      logFttcBroadbandStatus(STATUS_UNKNOWN);
-      logLteStatus(STATUS_UNKNOWN);
+      logConnectionStatus(STATUS_UNKNOWN, STATUS_UNKNOWN, STATUS_UNKNOWN);
     }
   } catch (error) {
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Checking LTE status failed\n${error}\n\n`);
