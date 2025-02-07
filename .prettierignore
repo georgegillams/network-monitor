@@ -1,0 +1,10 @@
+.next
+build
+
+node_modules
+.cache
+coverage/
+
+# Cruft
+.DS_Store
+npm-debug.log
