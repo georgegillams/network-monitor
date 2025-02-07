@@ -1,12 +1,12 @@
-const puppeteer = require("puppeteer");
+const puppeteer = require('puppeteer');
 
 let browser = null;
 let page = null;
 
-const createBrowser = async (executablePathArg) => {
+const createBrowser = async executablePathArg => {
   if (!browser) {
     browser = await puppeteer.launch({
-      headless: "new",
+      headless: 'new',
       ...(executablePathArg ? { executablePath: executablePathArg } : {}),
     });
   }
@@ -27,7 +27,7 @@ const simpleFetch = async (url, executablePathArg = null) => {
     await page.setViewport({ width: 1080, height: 1024 });
 
     // wait for page to finish loading
-    await page.waitForSelector("#lte_title_text");
+    await page.waitForSelector('#lte_title_text');
 
     // get full HTML string
     const pageContent = await page.content();
@@ -47,14 +47,14 @@ const getTimestampString = () => {
   return new Date().toISOString();
 };
 
-const getCliArg = (argFlag) => {
+const getCliArg = argFlag => {
   if (process.argv.includes(`--${argFlag}`)) {
     return process.argv[process.argv.indexOf(`--${argFlag}`) + 1];
   }
   return null;
 };
 
-const logsToHtml = (logs) => {
+const logsToHtml = logs => {
   return `<!DOCTYPE html>
 <html>
   <head>
@@ -84,7 +84,7 @@ const logsToHtml = (logs) => {
     </style>
   </head>
   <body>
-    <div>${logs.split("\n").join("<br/>")}</div>
+    <div>${logs.split('\n').join('<br/>')}</div>
     <div>
       <a href="/logs">Logs</a>
       <br/>
