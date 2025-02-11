@@ -97,7 +97,7 @@ const logPublicIpAddress = ipAddress => {
 const logConnectionStatus = (fttpBroadbandStatus, fttcBroadbandStatus, lteStatus) => {
   const newConnectionStatus = `${fttpBroadbandStatus} ${fttcBroadbandStatus} ${lteStatus}`;
   const statusChanged = lastConnectionStatus !== newConnectionStatus;
-  const logUnconditionally = lastConnectionStatus < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
+  const logUnconditionally = lastConnectionStatusLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
 
   if (statusChanged || logUnconditionally) {
     lastConnectionStatus = newConnectionStatus;
