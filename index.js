@@ -2,6 +2,18 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const http = require('http');
 const { getTimestampString, logsToHtml } = require('./utils');
+const {
+  STATUS_CONNECTED,
+  STATUS_DISCONNECTED,
+  STATUS_STANDBY,
+  STATUS_UNKNOWN,
+  SERVICE_FTTP_BROADBAND,
+  SERVICE_FTTC_BROADBAND,
+  SERVICE_MOBILE,
+  STATUS_UP,
+  STATUS_DOWN,
+  SERVICE_NETWORK,
+} = require('./constants');
 
 const MINUTES_1 = 1 * 60 * 1000;
 const HOURS_2 = 2 * 60 * 60 * 1000;
@@ -13,11 +25,6 @@ const TIME_BEFORE_UNCONDITIONAL_LOG = HOURS_4;
 const LOG_FILE = '../network_monitor_log.txt';
 const ERROR_FILE = '../network_monitor_error.txt';
 const IP_ADDRESS_FILE = '../network_monitor_IP_addresses.json';
-
-const STATUS_CONNECTED = 'Connected';
-const STATUS_DISCONNECTED = 'Disconnected';
-const STATUS_STANDBY = 'Standby';
-const STATUS_UNKNOWN = 'Unknown';
 
 let lastNetworkStatus = null;
 let lastConnectionStatus = null;
@@ -81,7 +88,6 @@ const addIpAddress = (type, ipAddress) => {
   fs.writeFileSync(IP_ADDRESS_FILE, JSON.stringify(ipAddresses, null, 2));
 };
 
-
 const logPublicIpAddress = ipAddress => {
   const ipChanged = lastIpAddress !== ipAddress;
   const logUnconditionally = lastIpAddressLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
@@ -93,7 +99,6 @@ const logPublicIpAddress = ipAddress => {
   }
 };
 
-
 const logConnectionStatus = (fttpBroadbandStatus, fttcBroadbandStatus, lteStatus) => {
   const newConnectionStatus = `${fttpBroadbandStatus} ${fttcBroadbandStatus} ${lteStatus}`;
   const statusChanged = lastConnectionStatus !== newConnectionStatus;
@@ -103,7 +108,10 @@ const logConnectionStatus = (fttpBroadbandStatus, fttcBroadbandStatus, lteStatus
     lastConnectionStatus = newConnectionStatus;
     lastConnectionStatusLogTimestamp = Date.now();
     const timeStamp = getTimestampString();
-    fs.appendFileSync(LOG_FILE, `${timeStamp} FTTP Broadband ${fttpBroadbandStatus}\n${timeStamp} FTTC Broadband ${fttcBroadbandStatus}\n${timeStamp} LTE ${lteStatus}\n`);
+    fs.appendFileSync(
+      LOG_FILE,
+      `${timeStamp} ${SERVICE_FTTP_BROADBAND} ${fttpBroadbandStatus}\n${timeStamp} ${SERVICE_FTTC_BROADBAND} ${fttcBroadbandStatus}\n${timeStamp} ${SERVICE_MOBILE} ${lteStatus}\n`
+    );
   }
 };
 
@@ -114,16 +122,16 @@ const logNetworkStatus = status => {
   if (statusChanged || logUnconditionally) {
     lastNetworkStatus = status;
     lastNetworkStatusLogTimestamp = Date.now();
-    fs.appendFileSync(LOG_FILE, `${getTimestampString()} NETWORK ${status}\n`);
+    fs.appendFileSync(LOG_FILE, `${getTimestampString()} ${SERVICE_NETWORK} ${status}\n`);
   }
 };
 
 const logNetworkUp = () => {
-  logNetworkStatus('UP');
+  logNetworkStatus(STATUS_UP);
 };
 
 const logNetworkDown = () => {
-  logNetworkStatus('DOWN');
+  logNetworkStatus(STATUS_DOWN);
 };
 
 const isNetworkUp = () => {
@@ -155,7 +163,7 @@ const checkConnectionStatus = async () => {
     if (!fs.existsSync(IP_ADDRESS_FILE)) {
       fs.writeFileSync(
         IP_ADDRESS_FILE,
-        JSON.stringify({ fttpBroadbandIpAddresses: [], fttcBroadbandIpAddresses: [], mobileIpAddresses: [] }),
+        JSON.stringify({ fttpBroadbandIpAddresses: [], fttcBroadbandIpAddresses: [], mobileIpAddresses: [] })
       );
     }
 
