@@ -1,4 +1,16 @@
 const puppeteer = require('puppeteer');
+const {
+  STATUS_CONNECTED,
+  STATUS_UNKNOWN,
+  STATUS_DISCONNECTED,
+  STATUS_STANDBY,
+  SERVICE_FTTP_BROADBAND,
+  SERVICE_FTTC_BROADBAND,
+  SERVICE_MOBILE,
+  SERVICE_NETWORK,
+  STATUS_UP,
+  STATUS_DOWN,
+} = require('./constants');
 
 let browser = null;
 let page = null;
@@ -54,6 +66,46 @@ const getCliArg = argFlag => {
   return null;
 };
 
+const getClassForLog = log => {
+  if (log.includes(STATUS_DISCONNECTED)) {
+    return 'error';
+  }
+
+  if (log.includes(STATUS_UNKNOWN)) {
+    return 'error';
+  }
+
+  if (log.includes(`${SERVICE_NETWORK} ${STATUS_UP}`)) {
+    return 'ok';
+  }
+
+  if (log.includes(`${SERVICE_NETWORK} ${STATUS_DOWN}`)) {
+    return 'error';
+  }
+
+  if (log.includes(`${SERVICE_FTTP_BROADBAND} ${STATUS_CONNECTED}`)) {
+    return 'ok';
+  }
+
+  if (log.includes(`${SERVICE_FTTC_BROADBAND} ${STATUS_STANDBY}`)) {
+    return 'ok';
+  }
+
+  if (log.includes(`${SERVICE_MOBILE} ${STATUS_STANDBY}`)) {
+    return 'ok';
+  }
+
+  if (log.includes(`${SERVICE_FTTC_BROADBAND} ${STATUS_CONNECTED}`)) {
+    return 'warn';
+  }
+
+  if (log.includes(`${SERVICE_MOBILE} ${STATUS_CONNECTED}`)) {
+    return 'warn';
+  }
+
+  return '';
+};
+
 const logsToHtml = logs => {
   return `<!DOCTYPE html>
 <html>
@@ -71,6 +123,18 @@ const logsToHtml = logs => {
         color: #9932cc
       }
 
+      .error {
+        color: #BA2020
+      }
+
+      .warn {
+        color: orange
+      }
+
+      .ok {
+        color: green
+      }
+
       @media (prefers-color-scheme: dark) {
         body {
           background: #1e1e1e;
@@ -80,11 +144,22 @@ const logsToHtml = logs => {
         a {
           color: #da70d6
         }
+
+        .error {
+          color: #CA2020
+        }
+
+        .ok {
+          color: #00a698
+        }
       }
     </style>
   </head>
   <body>
-    <div>${logs.split('\n').join('<br/>')}</div>
+    <div>${logs
+      .split('\n')
+      .map(log => `<span class="${getClassForLog(log)}">${log}</span>`)
+      .join('<br/>')}</div>
     <div>
       <a href="/logs">Logs</a>
       <br/>
