@@ -16,11 +16,12 @@ const {
 } = require('./constants');
 
 const MINUTES_1 = 1 * 60 * 1000;
-const HOURS_2 = 2 * 60 * 60 * 1000;
-const HOURS_4 = 4 * 60 * 60 * 1000;
+const HOURS_2 = 2 * 60 * MINUTES_1;
+const HOURS_4 = 4 * 60 * MINUTES_1;
 const TIME_BETWEEN_CHECKS = MINUTES_1;
 const TIME_BETWEEN_SPEED_TESTS = HOURS_2;
 const TIME_BEFORE_UNCONDITIONAL_LOG = HOURS_4;
+const TIME_BETWEEN_LOG_UPLOADS = HOURS_2;
 
 const LOG_FILE = '../network_monitor_log.txt';
 const ERROR_FILE = '../network_monitor_error.txt';
@@ -200,6 +201,26 @@ const runSpeedTest = () => {
   }
 };
 
+const uploadLogs = () => {
+  if (!process.env.WEBHOOK_ENDPOINT || !process.env.WEBHOOK_ACCESS_KEY) {
+    console.log('No webhook endpoint or access key provided');
+    return;
+  }
+  const last50LinesOfLogs = execSync(`tail -n 50 ${LOG_FILE}`).toString();
+  try {
+    fetch(process.env.WEBHOOK_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'access-key': process.env.WEBHOOK_ACCESS_KEY,
+      },
+      body: JSON.stringify({ logs: last50LinesOfLogs }),
+    });
+  } catch (error) {
+    fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Error uploading logs\n${error}\n\n`);
+  }
+};
+
 setInterval(() => {
   runSpeedTest();
 }, TIME_BETWEEN_SPEED_TESTS);
@@ -208,6 +229,12 @@ setInterval(() => {
   checkNetwork();
   checkConnectionStatus();
 }, TIME_BETWEEN_CHECKS);
+
+setInterval(async () => {
+  // Wait 1 minute for any other tasks to complete
+  await new Promise(resolve => setTimeout(resolve, MINUTES_1));
+  uploadLogs();
+}, TIME_BETWEEN_LOG_UPLOADS);
 
 const server = http.createServer();
 server.on('request', requestListener);
