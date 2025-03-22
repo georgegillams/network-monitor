@@ -67,19 +67,37 @@ const getCliArg = argFlag => {
 };
 
 const getClassForLog = log => {
-  if (log.includes(STATUS_DISCONNECTED)) {
-    return 'error';
+  // #region Speed
+  if (log.includes('Download: ') && log.includes('Upload: ') && log.includes('Ping: ')) {
+    const downloadSpeed = parseFloat(log.split('Download: ')[1].split(' ')[0]);
+    const uploadSpeed = parseFloat(log.split('Upload: ')[1].split(' ')[0]);
+    const ping = parseFloat(log.split('Ping: ')[1].split(' ')[0]);
+    if (downloadSpeed < 200 || uploadSpeed < 100 || ping > 50) {
+      return 'error';
+    }
+    if (downloadSpeed < 700 || uploadSpeed < 500 || ping > 10) {
+      return 'warn';
+    }
+    return 'ok';
   }
+  // #endregion
 
-  if (log.includes(STATUS_UNKNOWN)) {
-    return 'error';
-  }
-
+  // #region Network status
   if (log.includes(`${SERVICE_NETWORK} ${STATUS_UP}`)) {
     return 'ok';
   }
 
   if (log.includes(`${SERVICE_NETWORK} ${STATUS_DOWN}`)) {
+    return 'error';
+  }
+  // #endregion
+
+  // #region Interface connections
+  if (log.includes(STATUS_DISCONNECTED)) {
+    return 'error';
+  }
+
+  if (log.includes(STATUS_UNKNOWN)) {
     return 'error';
   }
 
@@ -102,16 +120,24 @@ const getClassForLog = log => {
   if (log.includes(`${SERVICE_MOBILE} ${STATUS_CONNECTED}`)) {
     return 'warn';
   }
+  // #endregion
 
   return '';
 };
 
-const logsToHtml = logs => {
-  return `<!DOCTYPE html>
+const logsToHtml = (logs, fullDocument = true) => {
+  return `${
+    fullDocument
+      ? `<!DOCTYPE html>
 <html>
   <head>
-    <style>
-      body {
+    <title>Logs</title>
+    `
+      : ``
+  }    <style>
+      ${
+        fullDocument
+          ? `body {
         font-family: monospace;
         background: white;
         color: #1e1e1e;
@@ -122,8 +148,9 @@ const logsToHtml = logs => {
       a {
         color: #9932cc
       }
-
-      .error {
+ `
+          : ``
+      }      .error {
         color: #BA2020
       }
 
@@ -154,22 +181,31 @@ const logsToHtml = logs => {
         }
       }
     </style>
-  </head>
-  <body>
+  ${
+    fullDocument
+      ? `  </head>
+  <body>`
+      : ``
+  }
     <div>${logs
       .split('\n')
       .map(log => `<span class="${getClassForLog(log)}">${log}</span>`)
       .join('<br/>')}</div>
-    <div>
+    ${
+      fullDocument
+        ? `    <div>
       <a href="/logs">Logs</a>
       <br/>
       <a href="/errors">Errors</a>
+    </div>
     <br/>
     <script type="text/javascript">
       window.scrollTo(0, document.body.scrollHeight);
     </script>
   </body>
-</html>`;
+</html>`
+        : ``
+    }`;
 };
 
 module.exports = { simpleFetch, getTimestampString, getCliArg, logsToHtml };
