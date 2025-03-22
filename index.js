@@ -229,8 +229,6 @@ const uploadLogs = () => {
     return false;
   }
 
-  shouldUploadLogsAt = null;
-
   if (!process.env.WEBHOOK_ENDPOINT || !process.env.WEBHOOK_ACCESS_KEY) {
     console.log('No webhook endpoint or access key provided');
     return;
@@ -250,7 +248,9 @@ const uploadLogs = () => {
       },
       body: JSON.stringify({ logs: recentLogsSinceLastUpload, htmlLogs: logsToHtml(recentLogsSinceLastUpload, false) }),
     });
+
     log(LOGS_UPLOADED_MESSAGE, undefined, false);
+    shouldUploadLogsAt = null;
   } catch (error) {
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Error uploading logs\n${error}\n\n`);
   }
