@@ -13,15 +13,17 @@ const {
   STATUS_UP,
   STATUS_DOWN,
   SERVICE_NETWORK,
+  LOGS_UPLOADED_MESSAGE,
 } = require('./constants');
 
+const SECONDS_30 = 30 * 1000;
 const MINUTES_1 = 1 * 60 * 1000;
 const HOURS_2 = 2 * 60 * MINUTES_1;
 const HOURS_4 = 4 * 60 * MINUTES_1;
 const TIME_BETWEEN_CHECKS = MINUTES_1;
 const TIME_BETWEEN_SPEED_TESTS = HOURS_2;
 const TIME_BEFORE_UNCONDITIONAL_LOG = HOURS_4;
-const TIME_BETWEEN_LOG_UPLOADS = HOURS_2;
+const TIME_BETWEEN_LOG_UPLOAD_ATTEMPTS = MINUTES_1;
 
 const LOG_FILE = '../network_monitor_log.txt';
 const ERROR_FILE = '../network_monitor_error.txt';
@@ -33,6 +35,7 @@ let lastIpAddress = null;
 let lastNetworkStatusLogTimestamp = 0;
 let lastConnectionStatusLogTimestamp = 0;
 let lastIpAddressLogTimestamp = 0;
+let shouldUploadLogsAt = null;
 
 const requestListener = async (req, res) => {
   if (req.url === '/logs-raw') {
@@ -80,6 +83,13 @@ const readFile = (fileName, defaultValue = '') => {
   return fs.readFileSync(fileName, { encoding: 'utf-8' });
 };
 
+const log = (message, timestampString = getTimestampString(), triggerLogUpload = true) => {
+  fs.appendFileSync(LOG_FILE, `${timestampString} ${message}\n`);
+  if (triggerLogUpload) {
+    shouldUploadLogsAt = Date.now() + SECONDS_30;
+  }
+};
+
 const addIpAddress = (type, ipAddress) => {
   const ipAddresses = JSON.parse(readFile(IP_ADDRESS_FILE, '{}'));
   if (!ipAddresses[type]) {
@@ -96,7 +106,7 @@ const logPublicIpAddress = ipAddress => {
   if (ipChanged || logUnconditionally) {
     lastIpAddress = ipAddress;
     lastIpAddressLogTimestamp = Date.now();
-    fs.appendFileSync(LOG_FILE, `${getTimestampString()} Public IP Address ${ipAddress}\n`);
+    log(`Public IP Address ${ipAddress}`);
   }
 };
 
@@ -109,10 +119,9 @@ const logConnectionStatus = (fttpBroadbandStatus, fttcBroadbandStatus, lteStatus
     lastConnectionStatus = newConnectionStatus;
     lastConnectionStatusLogTimestamp = Date.now();
     const timeStamp = getTimestampString();
-    fs.appendFileSync(
-      LOG_FILE,
-      `${timeStamp} ${SERVICE_FTTP_BROADBAND} ${fttpBroadbandStatus}\n${timeStamp} ${SERVICE_FTTC_BROADBAND} ${fttcBroadbandStatus}\n${timeStamp} ${SERVICE_MOBILE} ${lteStatus}\n`
-    );
+    log(`${SERVICE_FTTP_BROADBAND} ${fttpBroadbandStatus}`, timeStamp);
+    log(`${SERVICE_FTTC_BROADBAND} ${fttcBroadbandStatus}`, timeStamp);
+    log(`${SERVICE_MOBILE} ${lteStatus}`, timeStamp);
   }
 };
 
@@ -123,7 +132,7 @@ const logNetworkStatus = status => {
   if (statusChanged || logUnconditionally) {
     lastNetworkStatus = status;
     lastNetworkStatusLogTimestamp = Date.now();
-    fs.appendFileSync(LOG_FILE, `${getTimestampString()} ${SERVICE_NETWORK} ${status}\n`);
+    log(`${SERVICE_NETWORK} ${status}`);
   }
 };
 
@@ -195,18 +204,43 @@ const runSpeedTest = () => {
   try {
     const speedTestResults = execSync('speedtest-cli --secure --simple').toString();
     const resultsString = speedTestResults.split('\n').join(' ');
-    fs.appendFileSync(`${LOG_FILE}`, `${getTimestampString()} ${resultsString}\n`);
+    log(resultsString);
   } catch (error) {
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Speed test failed\n${error}\n\n`);
   }
 };
 
+const sliceLogsSinceLastUpload = logs => {
+  for (let i = logs.length - 1; i >= 0; i -= 1) {
+    if (logs[i].includes(LOGS_UPLOADED_MESSAGE)) {
+      return logs.slice(i);
+    }
+  }
+
+  return logs;
+};
+
 const uploadLogs = () => {
+  if (!shouldUploadLogsAt) {
+    return false;
+  }
+
+  if (shouldUploadLogsAt > Date.now()) {
+    return false;
+  }
+
+  shouldUploadLogsAt = null;
+
   if (!process.env.WEBHOOK_ENDPOINT || !process.env.WEBHOOK_ACCESS_KEY) {
     console.log('No webhook endpoint or access key provided');
     return;
   }
-  const last50LinesOfLogs = execSync(`tail -n 50 ${LOG_FILE}`).toString();
+  const last200LinesOfLogs = execSync(`tail -n 200 ${LOG_FILE}`)
+    .toString()
+    .split('\n')
+    .filter(log => log !== '');
+  const recentLogsSinceLastUpload = sliceLogsSinceLastUpload(last200LinesOfLogs).join('\n');
+
   try {
     fetch(process.env.WEBHOOK_ENDPOINT, {
       method: 'POST',
@@ -214,12 +248,18 @@ const uploadLogs = () => {
         'Content-Type': 'application/json',
         'access-key': process.env.WEBHOOK_ACCESS_KEY,
       },
-      body: JSON.stringify({ logs: last50LinesOfLogs }),
+      body: JSON.stringify({ logs: recentLogsSinceLastUpload, htmlLogs: logsToHtml(recentLogsSinceLastUpload, false) }),
     });
+    log(LOGS_UPLOADED_MESSAGE, undefined, false);
   } catch (error) {
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Error uploading logs\n${error}\n\n`);
   }
 };
+
+const millisToMinutes = millis => millis / 1000 / 60;
+const millisToHours = millis => millis / 1000 / 60 / 60;
+const millisToSecondsOrHours = millis =>
+  millisToHours(millis) < 1 ? `${millisToMinutes(millis)} minutes` : `${millisToHours(millis)} hours`;
 
 setInterval(() => {
   runSpeedTest();
@@ -231,14 +271,17 @@ setInterval(() => {
 }, TIME_BETWEEN_CHECKS);
 
 setInterval(async () => {
-  // Wait 1 minute for any other tasks to complete
-  await new Promise(resolve => setTimeout(resolve, MINUTES_1));
   uploadLogs();
-}, TIME_BETWEEN_LOG_UPLOADS);
+}, TIME_BETWEEN_LOG_UPLOAD_ATTEMPTS);
 
 const server = http.createServer();
 server.on('request', requestListener);
 
 server.listen(process.env.PORT || 8080);
 
-fs.appendFileSync(LOG_FILE, `${getTimestampString()} SERVER RUNNING\n`);
+const serverStartTimestamp = getTimestampString();
+
+log('SERVER RUNNING', serverStartTimestamp);
+log(`Checking network every ${millisToSecondsOrHours(TIME_BETWEEN_CHECKS)}`, serverStartTimestamp);
+log(`Checking speed every ${millisToSecondsOrHours(TIME_BETWEEN_SPEED_TESTS)}`, serverStartTimestamp);
+log(`Uploading logs every ${millisToSecondsOrHours(TIME_BETWEEN_LOG_UPLOAD_ATTEMPTS)}`, serverStartTimestamp);

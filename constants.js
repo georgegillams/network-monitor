@@ -8,6 +8,7 @@ const STATUS_DOWN = 'DOWN';
 const STATUS_STANDBY = 'Standby';
 const STATUS_UNKNOWN = 'Unknown';
 const STATUS_UP = 'UP';
+const LOGS_UPLOADED_MESSAGE = 'Logs uploaded';
 
 module.exports = {
   SERVICE_FTTC_BROADBAND,
@@ -20,4 +21,5 @@ module.exports = {
   STATUS_STANDBY,
   STATUS_UNKNOWN,
   STATUS_UP,
+  LOGS_UPLOADED_MESSAGE,
 };
