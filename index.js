@@ -14,6 +14,7 @@ const {
   STATUS_DOWN,
   SERVICE_NETWORK,
   LOGS_UPLOADED_MESSAGE,
+  SERVICE_ISP,
 } = require('./constants');
 
 const SECONDS_30 = 30 * 1000;
@@ -117,18 +118,14 @@ const logPublicIpAddress = ipAddress => {
   }
 };
 
-const logConnectionStatus = (fttpBroadbandStatus, fttcBroadbandStatus, lteStatus) => {
-  const newConnectionStatus = `${fttpBroadbandStatus} ${fttcBroadbandStatus} ${lteStatus}`;
+const logConnectionStatus = newConnectionStatus => {
   const statusChanged = lastConnectionStatus !== newConnectionStatus;
   const logUnconditionally = lastConnectionStatusLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
 
   if (statusChanged || logUnconditionally) {
     lastConnectionStatus = newConnectionStatus;
     lastConnectionStatusLogTimestamp = Date.now();
-    const timeStamp = getTimestampString();
-    log(`${SERVICE_FTTP_BROADBAND} ${fttpBroadbandStatus}`, timeStamp);
-    log(`${SERVICE_FTTC_BROADBAND} ${fttcBroadbandStatus}`, timeStamp);
-    log(`${SERVICE_MOBILE} ${lteStatus}`, timeStamp);
+    log(newConnectionStatus);
   }
 };
 
@@ -194,13 +191,13 @@ const checkConnectionStatus = async () => {
     const mobileConnected = mobileIpAddresses.some(address => publicIPAddress.includes(address));
     logPublicIpAddress(publicIPAddress);
     if (fttpBroadbandConnected) {
-      logConnectionStatus(STATUS_CONNECTED, STATUS_STANDBY, STATUS_STANDBY);
+      logConnectionStatus(`${SERVICE_FTTP_BROADBAND} ${STATUS_CONNECTED}`);
     } else if (fttcBroadbandConnected) {
-      logConnectionStatus(STATUS_DISCONNECTED, STATUS_CONNECTED, STATUS_STANDBY);
+      logConnectionStatus(`${SERVICE_FTTC_BROADBAND} ${STATUS_CONNECTED}`);
     } else if (mobileConnected) {
-      logConnectionStatus(STATUS_DISCONNECTED, STATUS_DISCONNECTED, STATUS_CONNECTED);
+      logConnectionStatus(`${SERVICE_MOBILE} ${STATUS_CONNECTED}`);
     } else {
-      logConnectionStatus(STATUS_UNKNOWN, STATUS_UNKNOWN, STATUS_UNKNOWN);
+      logConnectionStatus(`${SERVICE_ISP} ${STATUS_UNKNOWN}`);
     }
   } catch (error) {
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Checking LTE status failed\n${error}\n\n`);
