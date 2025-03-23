@@ -46,6 +46,13 @@ const requestListener = async (req, res) => {
     const logs = readFile(LOG_FILE);
     res.writeHead(200);
     res.end(logsToHtml(logs));
+  } else if (req.url === '/fttp-connected') {
+    res.writeHead(200);
+    if (lastConnectionStatus?.startsWith(STATUS_CONNECTED)) {
+      res.end('true');
+    } else {
+      res.end('false');
+    }
   } else if (req.url === '/errors') {
     const logs = readFile(ERROR_FILE);
     res.writeHead(200);
@@ -252,6 +259,7 @@ const uploadLogs = () => {
     log(LOGS_UPLOADED_MESSAGE, undefined, false);
     shouldUploadLogsAt = null;
   } catch (error) {
+    log('Logs could not be uploaded', undefined, false);
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Error uploading logs\n${error}\n\n`);
   }
 };
