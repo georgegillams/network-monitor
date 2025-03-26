@@ -37,6 +37,8 @@ let lastNetworkStatusLogTimestamp = 0;
 let lastConnectionStatusLogTimestamp = 0;
 let lastIpAddressLogTimestamp = 0;
 let shouldUploadLogsAt = null;
+let uploadingLogs = false;
+let queuedLogs = [];
 
 const requestListener = async (req, res) => {
   if (req.url === '/logs-raw') {
@@ -91,8 +93,30 @@ const readFile = (fileName, defaultValue = '') => {
   return fs.readFileSync(fileName, { encoding: 'utf-8' });
 };
 
+const flushLogs = () => {
+  if (queuedLogs.length > 0) {
+    fs.appendFileSync(LOG_FILE, `${getTimestampString()} Start flushing logs\n`);
+
+    queuedLogs.forEach(log => {
+      fs.appendFileSync(LOG_FILE, log + '\n');
+    });
+
+    fs.appendFileSync(LOG_FILE, `${getTimestampString()} End flushing logs\n`);
+
+    queuedLogs = [];
+    shouldUploadLogsAt = Date.now() + SECONDS_30;
+  }
+};
+
 const log = (message, timestampString = getTimestampString(), triggerLogUpload = true) => {
-  fs.appendFileSync(LOG_FILE, `${timestampString} ${message}\n`);
+  const output = `${timestampString} ${message}`;
+
+  if (uploadingLogs) {
+    queuedLogs.push(output);
+    return;
+  }
+
+  fs.appendFileSync(LOG_FILE, output + '\n');
   if (triggerLogUpload) {
     shouldUploadLogsAt = Date.now() + SECONDS_30;
   }
@@ -200,7 +224,7 @@ const checkConnectionStatus = async () => {
       logConnectionStatus(`${SERVICE_ISP} ${STATUS_UNKNOWN}`);
     }
   } catch (error) {
-    fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Checking LTE status failed\n${error}\n\n`);
+    fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Checking connection status failed\n${error}\n\n`);
   }
 };
 
@@ -224,7 +248,7 @@ const sliceLogsSinceLastUpload = logs => {
   return logs;
 };
 
-const uploadLogs = () => {
+const uploadLogs = async () => {
   if (!shouldUploadLogsAt) {
     return false;
   }
@@ -237,14 +261,16 @@ const uploadLogs = () => {
     console.log('No webhook endpoint or access key provided');
     return;
   }
-  const last200LinesOfLogs = execSync(`tail -n 200 ${LOG_FILE}`)
-    .toString()
-    .split('\n')
-    .filter(log => log !== '');
-  const recentLogsSinceLastUpload = sliceLogsSinceLastUpload(last200LinesOfLogs).join('\n');
 
   try {
-    fetch(process.env.WEBHOOK_ENDPOINT, {
+    uploadingLogs = true;
+    const last200LinesOfLogs = execSync(`tail -n 200 ${LOG_FILE}`)
+      .toString()
+      .split('\n')
+      .filter(log => log !== '');
+    const recentLogsSinceLastUpload = sliceLogsSinceLastUpload(last200LinesOfLogs).join('\n');
+
+    const fetchResult = await fetch(process.env.WEBHOOK_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -252,12 +278,20 @@ const uploadLogs = () => {
       },
       body: JSON.stringify({ logs: recentLogsSinceLastUpload, htmlLogs: logsToHtml(recentLogsSinceLastUpload, false) }),
     });
-
-    log(LOGS_UPLOADED_MESSAGE, undefined, false);
-    shouldUploadLogsAt = null;
+    if (fetchResult.status === 200) {
+      uploadingLogs = false;
+      // This will be logged normally as uploadingLogs is now false
+      log(LOGS_UPLOADED_MESSAGE, undefined, false);
+      shouldUploadLogsAt = null;
+    } else {
+      throw new Error('Logs could not be uploaded - status code: ' + fetchResult.status);
+    }
   } catch (error) {
     log('Logs could not be uploaded', undefined, false);
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Error uploading logs\n${error}\n\n`);
+  } finally {
+    uploadingLogs = false;
+    flushLogs();
   }
 };
 
@@ -290,3 +324,13 @@ log('SERVER RUNNING', serverStartTimestamp);
 log(`Checking network every ${millisToSecondsOrHours(TIME_BETWEEN_CHECKS)}`, serverStartTimestamp);
 log(`Checking speed every ${millisToSecondsOrHours(TIME_BETWEEN_SPEED_TESTS)}`, serverStartTimestamp);
 log(`Uploading logs every ${millisToSecondsOrHours(TIME_BETWEEN_LOG_UPLOAD_ATTEMPTS)}`, serverStartTimestamp);
+
+process.on('uncaughtException', error => {
+  log(`Uncaught exception`);
+  fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Uncaught exception: ${error}\n\n`);
+});
+
+process.on('unhandledRejection', error => {
+  log(`Unhandled rejection`);
+  fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Unhandled rejection: ${error}\n\n`);
+});
