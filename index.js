@@ -4,8 +4,6 @@ const http = require('http');
 const { getTimestampString, logsToHtml } = require('./utils');
 const {
   STATUS_CONNECTED,
-  STATUS_DISCONNECTED,
-  STATUS_STANDBY,
   STATUS_UNKNOWN,
   SERVICE_FTTP_BROADBAND,
   SERVICE_FTTC_BROADBAND,
@@ -13,11 +11,9 @@ const {
   STATUS_UP,
   STATUS_DOWN,
   SERVICE_NETWORK,
-  LOGS_UPLOADED_MESSAGE,
   SERVICE_ISP,
 } = require('./constants');
 
-const SECONDS_30 = 30 * 1000;
 const MINUTES_1 = 1 * 60 * 1000;
 const HOURS_2 = 2 * 60 * MINUTES_1;
 const HOURS_4 = 4 * 60 * MINUTES_1;
@@ -27,6 +23,7 @@ const TIME_BEFORE_UNCONDITIONAL_LOG = HOURS_4;
 const TIME_BETWEEN_LOG_UPLOAD_ATTEMPTS = MINUTES_1;
 
 const LOG_FILE = '../network_monitor_log.txt';
+const LAST_LOG_UPLOADED_FILE = '../network_monitor_last_log_uploaded.txt';
 const ERROR_FILE = '../network_monitor_error.txt';
 const IP_ADDRESS_FILE = '../network_monitor_IP_addresses.json';
 
@@ -36,9 +33,6 @@ let lastIpAddress = null;
 let lastNetworkStatusLogTimestamp = 0;
 let lastConnectionStatusLogTimestamp = 0;
 let lastIpAddressLogTimestamp = 0;
-let shouldUploadLogsAt = null;
-let uploadingLogs = false;
-let queuedLogs = [];
 
 const requestListener = async (req, res) => {
   if (req.url === '/logs-raw') {
@@ -93,33 +87,10 @@ const readFile = (fileName, defaultValue = '') => {
   return fs.readFileSync(fileName, { encoding: 'utf-8' });
 };
 
-const flushLogs = () => {
-  if (queuedLogs.length > 0) {
-    fs.appendFileSync(LOG_FILE, `${getTimestampString()} Start flushing logs\n`);
-
-    queuedLogs.forEach(log => {
-      fs.appendFileSync(LOG_FILE, log + '\n');
-    });
-
-    fs.appendFileSync(LOG_FILE, `${getTimestampString()} End flushing logs\n`);
-
-    queuedLogs = [];
-    shouldUploadLogsAt = Date.now() + SECONDS_30;
-  }
-};
-
-const log = (message, timestampString = getTimestampString(), triggerLogUpload = true) => {
+const log = (message, timestampString = getTimestampString()) => {
   const output = `${timestampString} ${message}`;
 
-  if (uploadingLogs) {
-    queuedLogs.push(output);
-    return;
-  }
-
   fs.appendFileSync(LOG_FILE, output + '\n');
-  if (triggerLogUpload) {
-    shouldUploadLogsAt = Date.now() + SECONDS_30;
-  }
 };
 
 const addIpAddress = (type, ipAddress) => {
@@ -238,37 +209,25 @@ const runSpeedTest = () => {
   }
 };
 
-const sliceLogsSinceLastUpload = logs => {
-  for (let i = logs.length - 1; i >= 0; i -= 1) {
-    if (logs[i].includes(LOGS_UPLOADED_MESSAGE)) {
-      return logs.slice(i);
-    }
-  }
-
-  return logs;
-};
-
 const uploadLogs = async () => {
-  if (!shouldUploadLogsAt) {
-    return false;
-  }
-
-  if (shouldUploadLogsAt > Date.now()) {
-    return false;
-  }
-
   if (!process.env.WEBHOOK_ENDPOINT || !process.env.WEBHOOK_ACCESS_KEY) {
     console.log('No webhook endpoint or access key provided');
     return;
   }
 
   try {
-    uploadingLogs = true;
     const last200LinesOfLogs = execSync(`tail -n 200 ${LOG_FILE}`)
       .toString()
       .split('\n')
       .filter(log => log !== '');
-    const recentLogsSinceLastUpload = sliceLogsSinceLastUpload(last200LinesOfLogs).join('\n');
+    const lastUploadedLog = readFile(LAST_LOG_UPLOADED_FILE, undefined);
+    const indexOfLastUploadedLog = last200LinesOfLogs.findIndex(log => log === lastUploadedLog);
+    const recentLogsSinceLastUpload = last200LinesOfLogs.slice(indexOfLastUploadedLog + 1);
+    if (recentLogsSinceLastUpload.length === 0) {
+      return;
+    }
+
+    const joinedRecentLogs = recentLogsSinceLastUpload.join('\n');
 
     const fetchResult = await fetch(process.env.WEBHOOK_ENDPOINT, {
       method: 'POST',
@@ -276,22 +235,16 @@ const uploadLogs = async () => {
         'Content-Type': 'application/json',
         'access-key': process.env.WEBHOOK_ACCESS_KEY,
       },
-      body: JSON.stringify({ logs: recentLogsSinceLastUpload, htmlLogs: logsToHtml(recentLogsSinceLastUpload, false) }),
+      body: JSON.stringify({ logs: joinedRecentLogs, htmlLogs: logsToHtml(joinedRecentLogs, false) }),
     });
     if (fetchResult.status === 200) {
-      uploadingLogs = false;
-      // This will be logged normally as uploadingLogs is now false
-      log(LOGS_UPLOADED_MESSAGE, undefined, false);
-      shouldUploadLogsAt = null;
+      fs.writeFileSync(LAST_LOG_UPLOADED_FILE, recentLogsSinceLastUpload[recentLogsSinceLastUpload.length - 1]);
     } else {
       throw new Error('Logs could not be uploaded - status code: ' + fetchResult.status);
     }
   } catch (error) {
     log('Logs could not be uploaded', undefined, false);
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Error uploading logs\n${error}\n\n`);
-  } finally {
-    uploadingLogs = false;
-    flushLogs();
   }
 };
 
