@@ -29,6 +29,7 @@ const IP_ADDRESS_FILE = '../network_monitor_IP_addresses.json';
 
 let lastNetworkStatus = null;
 let lastConnectionStatus = null;
+let lastIsGoodConnection = null;
 let lastIpAddress = null;
 let lastNetworkStatusLogTimestamp = 0;
 let lastConnectionStatusLogTimestamp = 0;
@@ -113,7 +114,9 @@ const logPublicIpAddress = ipAddress => {
   }
 };
 
-const logConnectionStatus = newConnectionStatus => {
+const logConnectionStatus = (newConnectionStatus, isGoodConnection) => {
+  const isGoodConnectionChanged = lastIsGoodConnection !== null && lastIsGoodConnection !== isGoodConnection;
+  lastIsGoodConnection = isGoodConnection;
   const statusChanged = lastConnectionStatus !== newConnectionStatus;
   const logUnconditionally = lastConnectionStatusLogTimestamp < Date.now() - TIME_BEFORE_UNCONDITIONAL_LOG;
 
@@ -121,6 +124,16 @@ const logConnectionStatus = newConnectionStatus => {
     lastConnectionStatus = newConnectionStatus;
     lastConnectionStatusLogTimestamp = Date.now();
     log(newConnectionStatus);
+  }
+
+  // Connection has become good
+  if (isGoodConnectionChanged && isGoodConnection) {
+    fetch(`http://192.168.1.96:3020/button-network-status?event=click`);
+  }
+
+  // Connection is bad
+  if (!isGoodConnection) {
+    fetch(`http://192.168.1.96:3020/button-network-status?event=double-click`);
   }
 };
 
@@ -186,13 +199,13 @@ const checkConnectionStatus = async () => {
     const mobileConnected = mobileIpAddresses.some(address => publicIPAddress.includes(address));
     logPublicIpAddress(publicIPAddress);
     if (fttpBroadbandConnected) {
-      logConnectionStatus(`${SERVICE_FTTP_BROADBAND} ${STATUS_CONNECTED}`);
+      logConnectionStatus(`${SERVICE_FTTP_BROADBAND} ${STATUS_CONNECTED}`, true);
     } else if (fttcBroadbandConnected) {
-      logConnectionStatus(`${SERVICE_FTTC_BROADBAND} ${STATUS_CONNECTED}`);
+      logConnectionStatus(`${SERVICE_FTTC_BROADBAND} ${STATUS_CONNECTED}`, false);
     } else if (mobileConnected) {
-      logConnectionStatus(`${SERVICE_MOBILE} ${STATUS_CONNECTED}`);
+      logConnectionStatus(`${SERVICE_MOBILE} ${STATUS_CONNECTED}`, false);
     } else {
-      logConnectionStatus(`${SERVICE_ISP} ${STATUS_UNKNOWN}`);
+      logConnectionStatus(`${SERVICE_ISP} ${STATUS_UNKNOWN}`, false);
     }
   } catch (error) {
     fs.appendFileSync(`${ERROR_FILE}`, `${getTimestampString()} Checking connection status failed\n${error}\n\n`);
