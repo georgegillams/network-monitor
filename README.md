@@ -28,3 +28,11 @@ yarn start --executable-path "/usr/bin/chromium-browser"
 | PORT               | The port the server will listen on                                       | 8080    |
 | WEBHOOK_ENDPOINT   | The endpoint to send POST requests to when the network status changes    |         |
 | WEBHOOK_ACCESS_KEY | The access-key to use when sending POST requests to the webhook endpoint |         |
+
+## Updating IP address ranges
+
+To add an IP range, use:
+
+- `{serverAddress}/add-fttp-ip?X.X.X.X/X`
+- `{serverAddress}/add-fttc-ip?X.X.X.X/X`
+- `{serverAddress}/add-lte-ip?X.X.X.X/X`
