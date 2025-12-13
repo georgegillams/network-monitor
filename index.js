@@ -1,7 +1,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const http = require('http');
-const { getTimestampString, logsToHtml } = require('./utils');
+const { getTimestampString, logsToHtml, matchesRange } = require('./utils');
 const {
   STATUS_CONNECTED,
   STATUS_UNKNOWN,
@@ -94,47 +94,15 @@ const log = (message, timestampString = getTimestampString()) => {
   fs.appendFileSync(LOG_FILE, output + '\n');
 };
 
-const ipToNumber = ip => {
-  const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some(part => isNaN(part) || part < 0 || part > 255)) {
-    return null;
-  }
-  return (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3];
-};
-
-const matchesRange = (ipAddress, ipRange) => {
-  // If the range contains "/", treat it as CIDR notation
-  if (ipRange.includes('/')) {
-    const [baseIp, prefixLengthStr] = ipRange.split('/');
-    const prefixLength = parseInt(prefixLengthStr, 10);
-
-    if (isNaN(prefixLength) || prefixLength < 0 || prefixLength > 32) {
-      return false;
-    }
-
-    const baseIpNumber = ipToNumber(baseIp);
-    const ipNumber = ipToNumber(ipAddress);
-
-    if (baseIpNumber === null || ipNumber === null) {
-      return false;
-    }
-
-    // Calculate subnet mask
-    const mask = prefixLength === 0 ? 0 : (0xffffffff << (32 - prefixLength)) >>> 0;
-
-    // Check if IP is in the same subnet
-    return (ipNumber & mask) === (baseIpNumber & mask);
-  }
-
-  // Fallback to old substring matching for backward compatibility
-  return ipAddress.includes(ipRange);
-};
-
 const addIpAddress = (type, ipAddress) => {
   const ipAddresses = JSON.parse(readFile(IP_ADDRESS_FILE, '{}'));
   if (!ipAddresses[type]) {
     ipAddresses[type] = [];
   }
+  if (ipAddresses[type].includes(ipAddress)) {
+    return;
+  }
+
   ipAddresses[type].push(ipAddress);
   fs.writeFileSync(IP_ADDRESS_FILE, JSON.stringify(ipAddresses, null, 2));
 };
@@ -226,17 +194,14 @@ const checkConnectionStatus = async () => {
     }
 
     const ipAddressesText = readFile(IP_ADDRESS_FILE);
-    const {
-      fttpBroadbandIpAddresses: fttpBroadbandIpAddressRanges,
-      fttcBroadbandIpAddresses: fttcBroadbandIpAddressRanges,
-      mobileIpAddresses: mobileIpAddressRanges,
-    } = JSON.parse(ipAddressesText);
+    const { fttpBroadbandIpAddresses, fttcBroadbandIpAddresses, mobileIpAddresses } = JSON.parse(ipAddressesText);
 
     const publicIPAddress = execSync('curl -s https://checkip.amazonaws.com').toString().replaceAll('\n', '');
+    console.log(`publicIPAddress: ${publicIPAddress}`);
 
-    const fttpBroadbandConnected = fttpBroadbandIpAddressRanges.some(range => matchesRange(publicIPAddress, range));
-    const fttcBroadbandConnected = fttcBroadbandIpAddressRanges.some(range => matchesRange(publicIPAddress, range));
-    const mobileConnected = mobileIpAddressRanges.some(range => matchesRange(publicIPAddress, range));
+    const fttpBroadbandConnected = fttpBroadbandIpAddresses.some(range => matchesRange(publicIPAddress, range));
+    const fttcBroadbandConnected = fttcBroadbandIpAddresses.some(range => matchesRange(publicIPAddress, range));
+    const mobileConnected = mobileIpAddresses.some(range => matchesRange(publicIPAddress, range));
     logPublicIpAddress(publicIPAddress);
     if (fttpBroadbandConnected) {
       logConnectionStatus(`${SERVICE_FTTP_BROADBAND} ${STATUS_CONNECTED}`, true);
