@@ -26,6 +26,7 @@ const LOG_FILE = '../network_monitor_log.txt';
 const LAST_LOG_UPLOADED_FILE = '../network_monitor_last_log_uploaded.txt';
 const ERROR_FILE = '../network_monitor_error.txt';
 const IP_ADDRESS_FILE = '../network_monitor_IP_addresses.json';
+const LIGHTING_ENABLED_FILE = '../network_monitor_lighting_enabled.txt';
 
 let lastNetworkStatus = null;
 let lastConnectionStatus = null;
@@ -74,6 +75,14 @@ const requestListener = async (req, res) => {
     addIpAddress('mobileIpAddresses', ipAddress);
     res.writeHead(200);
     res.end('success');
+  } else if (`${req.url}`.startsWith('/disable-lighting')) {
+    setLightingEnabled(false);
+    res.writeHead(200);
+    res.end('success');
+  } else if (`${req.url}`.startsWith('/enable-lighting')) {
+    setLightingEnabled(true);
+    res.writeHead(200);
+    res.end('success');
   } else {
     res.writeHead(404);
     res.end('Not found');
@@ -94,7 +103,22 @@ const log = (message, timestampString = getTimestampString()) => {
   fs.appendFileSync(LOG_FILE, output + '\n');
 };
 
+const setLightingEnabled = enabled => {
+  fs.writeFileSync(LIGHTING_ENABLED_FILE, enabled ? 'true' : 'false');
+};
+
+const getIsLightingEnabled = () => {
+  if (!fs.existsSync(LIGHTING_ENABLED_FILE)) {
+    return true;
+  }
+  return fs.readFileSync(LIGHTING_ENABLED_FILE, { encoding: 'utf-8' }) === 'true';
+};
+
 const addIpAddress = (type, ipAddress) => {
+  if (!ipAddress) {
+    return;
+  }
+
   const ipAddresses = JSON.parse(readFile(IP_ADDRESS_FILE, '{}'));
   if (!ipAddresses[type]) {
     ipAddresses[type] = [];
@@ -131,12 +155,12 @@ const logConnectionStatus = (newConnectionStatus, isGoodConnection) => {
   }
 
   // Connection has become good
-  if (isGoodConnectionChanged && isGoodConnection) {
+  if (isGoodConnectionChanged && isGoodConnection && getIsLightingEnabled()) {
     fetch(`http://192.168.1.96:3020/button-network-status?event=click`);
   }
 
   // Connection is bad
-  if (!isGoodConnection) {
+  if (!isGoodConnection && getIsLightingEnabled()) {
     fetch(`http://192.168.1.96:3020/button-network-status?event=double-click`);
   }
 };
