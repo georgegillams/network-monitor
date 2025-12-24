@@ -21,6 +21,7 @@ const TIME_BETWEEN_CHECKS = MINUTES_1;
 const TIME_BETWEEN_SPEED_TESTS = HOURS_2;
 const TIME_BEFORE_UNCONDITIONAL_LOG = HOURS_4;
 const TIME_BETWEEN_LOG_UPLOAD_ATTEMPTS = MINUTES_1;
+const TIME_BETWEEN_LIGHT_DISABLED_LOG = HOURS_2;
 
 const LOG_FILE = '../network_monitor_log.txt';
 const LAST_LOG_UPLOADED_FILE = '../network_monitor_last_log_uploaded.txt';
@@ -307,6 +308,12 @@ setInterval(() => {
 setInterval(async () => {
   uploadLogs();
 }, TIME_BETWEEN_LOG_UPLOAD_ATTEMPTS);
+
+setInterval(() => {
+  if (!getIsLightingEnabled()) {
+    log('Lights disabled');
+  }
+}, TIME_BETWEEN_LIGHT_DISABLED_LOG);
 
 const server = http.createServer();
 server.on('request', requestListener);
